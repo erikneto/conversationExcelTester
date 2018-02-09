@@ -22,7 +22,9 @@ cs = new Conversation({
 const wb = XLSX.readFile(args.sourceFile);
 const examples = XLSX.utils.sheet_to_json(wb.Sheets['Exemplos'], { raw: true });
 
-const testes = examples.map((e) => {
+let totalRows = examples.length;
+let doneRows = 1;
+const testes = examples.map((e, i) => {
     return testarMsg(e.Exemplos);
 })
 
@@ -58,16 +60,23 @@ Promise.all(testes).then((result) => {
     nwb.Sheets.Exemplos['!ref'] = 'A1:C' + (result.length + 1);
     XLSX.writeFile(nwb, args.destinationFile);
 })
+    .catch((error) => { console.log(error) })
 
-
-function testarMsg(input) {
+function testarMsg(input, retries) {
     return new Promise((resolve, reject) => {
         cs.message({
             workspace_id: args.workspaceWCS,
             input: { 'text': input }
-        }, function (err, response) {
-            if (err)
+        }, async (err, response) => {
+            if (err) {
+                if (['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT'].indexOf(err.code) > -1) {
+                    retries = (retries || 0) + 1;
+                    await pause(retries)
+                    return resolve(await testarMsg(input, retries));
+                }
                 return reject(err);
+            }
+            //console.log(input)
 
             let intent = {
                 intent: 'N/A',
@@ -79,10 +88,19 @@ function testarMsg(input) {
                     confidence: response.intents[0].confidence
                 };
             }
+            console.log(`${doneRows++} / ${totalRows} => ${input}`);
             return resolve({
                 input,
                 intent
             });
         });
+    })
+}
+
+function pause(ms) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            return resolve(true);
+        }, ms);
     })
 }
