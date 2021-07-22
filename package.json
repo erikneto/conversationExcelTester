@@ -11,6 +11,6 @@
     "dependencies": {
         "parse-cli-arguments": "^1.0.1",
         "ibm-watson": "^5.4.0",
-        "xlsx": "^0.11.18"
+        "xlsx": "^0.17.0"
     }
 }
